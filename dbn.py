@@ -168,7 +168,7 @@ if __name__ == "__main__":
     with graph.as_default():
         input_size = 13  # 你输入的数据特征数量
         lr = 0.001
-        train_ecpho = 20  # 训练次数
+        train_ecpho = 50  # 训练次数
 
         filename = 'Boston House Price Dataset.txt'
         dataMat,labelMat=splitDataSet(filename)
@@ -188,12 +188,12 @@ if __name__ == "__main__":
        sess.run(mean, feed_dict={xs: dataMat})
        sess.run(std, feed_dict={xs: dataMat})
        num = sess.run(data, feed_dict={xs:dataMat})
-       print(num)
+       # print(num)
 
 
        trainX=num[:400,:]
        trainY =labelMat[:400]
-       testX=num[400:,:]
+       testX=dataMat[400:,:]
        testY = labelMat[400:]
 
        # print(trainX[0:3])
@@ -205,7 +205,7 @@ if __name__ == "__main__":
 
        tf.set_random_seed(seed=99999)
        np.random.seed(123)
-       dbn.pretrain(sess, trainX, lr=lr)
+       dbn.pretrain(sess, trainX, pretraining_epochs=train_ecpho,lr=lr)
        dbn.finetuning(sess, trainX, trainY, testX, testY, lr=lr, training_epochs=train_ecpho)
 
        file_name = 'saved_model/model.ckpt'  # 将保存到当前目录下的的saved_model文件夹下model.ckpt文件
