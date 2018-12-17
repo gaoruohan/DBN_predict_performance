@@ -66,7 +66,7 @@ class DBN(object):
         # The accuracy
         # self.accuracy = self.output_layer.accuarcy(self.y)
 
-    def pretrain(self, sess, train_x, batch_size=2, pretraining_epochs=10, lr=0.01, k=1,
+    def pretrain(self, sess, train_x, batch_size=2, pretraining_epochs=20, lr=0.01, k=1,
                  display_step=1):
         """
         Pretrain the layers (just train the RBM layers)
@@ -104,11 +104,12 @@ class DBN(object):
         end_time = timeit.default_timer()
         print("\nThe pretraining process ran for {0} minutes".format((end_time - start_time) / 60))
 
-    def finetuning(self, sess, train_x, train_y, test_x, test_y, training_epochs=10, batch_size=100, lr=0.1,
+    def finetuning(self, sess, train_x, train_y, test_x, test_y, training_epochs=20, batch_size=50, lr=0.1,
                    display_step=1):
         """
         Finetuing the network
         """
+
         print("\nStart finetuning...\n")
         start_time = timeit.default_timer()
         train_op = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self.cost)
@@ -146,17 +147,17 @@ def loadDataSet(data, ratio):
             testData.append(data[i])  # 测试数据集列表
     return trainingData, testData
 
-def splitDataSet(data):
-    numFeat = len(data[0])-1
+def splitDataSet(filename):
+    numFeat = len(open(filename).readline().split())-1
     dataMat= [];labelMat=[]
-    x= np.array(data).shape[0]
-    for a in range(0,x):
-        lineArr=[]
-        # curLine=data[a].strip().split()
+    fr=open(filename)
+    for line in fr.readlines():
+        lineArr = []
+        curline =line.strip().split()
         for i in range(numFeat):
-            lineArr.append(float(data[a][i]))
+            lineArr.append(float(curline[i]))
         dataMat.append(lineArr)
-        labelMat.append(float(data[a][-1]))
+        labelMat.append(float(curline[-1]))
     return np.array(dataMat),np.array(labelMat)
 
 
@@ -167,29 +168,39 @@ if __name__ == "__main__":
     with graph.as_default():
         input_size = 13  # 你输入的数据特征数量
         lr = 0.001
-        train_ecpho = 10  # 训练次数
+        train_ecpho = 20  # 训练次数
 
         filename = 'Boston House Price Dataset.txt'
-        fr = np.loadtxt(filename)
-        xs = tf.placeholder(dtype=tf.float32, shape=[None, 14])
+        dataMat,labelMat=splitDataSet(filename)
+        # print(dataMat[0:3])
+        # print(labelMat[0:3])
+        xs = tf.placeholder(dtype=tf.float32, shape=[None, 13])
         mean, std = tf.nn.moments(xs, axes=[0])
         scale = 0.1
         shift = 0
         epsilon = 0.001
         data = tf.nn.batch_normalization(xs, mean, std, shift, scale, epsilon)
-        dbn = DBN(n_in=13, n_out=1, hidden_layers_sizes=[900])
+        dbn = DBN(n_in=13, n_out=1, hidden_layers_sizes=[900,900,500])
         init = tf.global_variables_initializer()
         saver = tf.train.Saver()
 
     with tf.Session(graph=graph) as sess:
-       sess.run(mean, feed_dict={xs: fr})
-       sess.run(std, feed_dict={xs: fr})
-       num = sess.run(data, feed_dict={xs:fr})
+       sess.run(mean, feed_dict={xs: dataMat})
+       sess.run(std, feed_dict={xs: dataMat})
+       num = sess.run(data, feed_dict={xs:dataMat})
        print(num)
 
-       trainSet, testSet = loadDataSet(num, 0.7)
-       trainX, trainY = splitDataSet(trainSet)
-       testX, testY = splitDataSet(testSet)
+
+       trainX=num[:400,:]
+       trainY =labelMat[:400]
+       testX=num[400:,:]
+       testY = labelMat[400:]
+
+       # print(trainX[0:3])
+       # print(trainY[0:3])
+       # print(testX[0:3])
+       # print(testY[0:3])
+
        sess.run(init)
 
        tf.set_random_seed(seed=99999)
