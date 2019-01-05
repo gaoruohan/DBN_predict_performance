@@ -5,12 +5,23 @@ author: Cuson
 """
 import timeit
 import os
+
+from sklearn.preprocessing import MinMaxScaler
+import pandas as pd
 from BP import BPNeuralNetwork
 import tensorflow as tf
 import numpy as np
 from mlp import HiddenLayer
 from rbm import RBM
 import random
+import matplotlib.pyplot as plt
+
+mm = MinMaxScaler()
+def MaxMinNormalization(x):
+    mm_data = mm.fit_transform(x)
+    return mm_data
+
+
 # 搭建模型
 class DBN(object):
     """
@@ -64,7 +75,7 @@ class DBN(object):
         with tf.name_scope('output_loss'):
             self.cost = self.output_layer.cost(self.y)
         # The accuracy
-        # self.accuracy = self.output_layer.accuarcy(self.y)
+        self.accuracy = self.output_layer.accuarcy(self.y)
 
     def pretrain(self, sess, train_x, batch_size=2, pretraining_epochs=20, lr=0.01, k=1,
                  display_step=1):
@@ -109,7 +120,8 @@ class DBN(object):
         """
         Finetuing the network
         """
-
+        accu=[]
+        accuu=[]
         print("\nStart finetuning...\n")
         start_time = timeit.default_timer()
         train_op = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self.cost)
@@ -122,18 +134,40 @@ class DBN(object):
                 x_batch = train_x[step * batch_size:(step + 1) * batch_size]
                 y_batch = train_y[step * batch_size:(step + 1) * batch_size]
                 # 训练
-                sess.run(train_op, feed_dict={self.x: x_batch, self.y: np.transpose([y_batch])})
+                sess.run(train_op, feed_dict={self.x: x_batch, self.y: y_batch})
                 # 计算cost
-                avg_cost += sess.run(self.cost, feed_dict={self.x: x_batch, self.y:np.transpose([y_batch])})/ batch_num
+                avg_cost += sess.run(self.cost, feed_dict={self.x: x_batch, self.y:y_batch})/ batch_num
                 # 输出
             if epoch % display_step == 0:
-                val_acc = sess.run(self.cost, feed_dict={self.x: test_x, self.y: np.transpose([test_y])})
+                val_acc = sess.run(self.cost, feed_dict={self.x: test_x, self.y: test_y})
+                # accu.append(val_acc)
+                # accuu.append(avg_cost)
+
                 print("\tEpoch {0} cost: {1} accuracy:{2}".format(epoch, avg_cost,val_acc))
 
             # result = sess.run(merged, feed_dict={self.x: test_x, self.y: test_y})  # 输出
             # writer.add_summary(result, epoch)
         end_time = timeit.default_timer()
         print("\nThe finetuning process ran for {0} minutes".format((end_time - start_time) / 60))
+        # y_aix = np.array(accu)
+        # y_aix1=np.array(accuu)
+        # x_aix = np.transpose(np.arange(1, 6))
+        # plt.plot(x_aix, y_aix,label="predict")
+        # plt.plot(x_aix,y_aix1,label="real")
+        # plt.savefig("E:\\高若涵计算机毕设\\DBN_predict_performance\\picture\\test_p30_f3.jpg")
+        # plt.show()
+
+    def predict(self, sess, x_test=None):
+        print("\nStart predict...\n")
+
+        # predict_model = theano.function(
+        #     inputs=[self.params],
+        #     outputs=self.output_layer.y_pre)
+        dbn_y_pre_temp = sess.run(self.output_layer.output, feed_dict={self.x: x_test})
+        # print(dbn_y_pre_temp)
+        dbn_y_pre = pd.DataFrame(mm.inverse_transform(dbn_y_pre_temp))
+        dbn_y_pre.to_csv('NSW_06.csv')
+        print("\nPredict over...\n")
 
 def loadDataSet(data, ratio):
     trainingData = []
@@ -162,52 +196,47 @@ def splitDataSet(filename):
 
 
 if __name__ == "__main__":
-    # keep_prob = 0.6  # dropout的概率
 
     graph = tf.Graph()
     with graph.as_default():
         input_size = 13  # 你输入的数据特征数量
-        lr = 0.001
+        lr = 0.01
         train_ecpho = 50  # 训练次数
 
+        start_time0 = timeit.default_timer()
+
         filename = 'Boston House Price Dataset.txt'
-        dataMat,labelMat=splitDataSet(filename)
+        dataMat, labelMat = splitDataSet(filename)
         # print(dataMat[0:3])
         # print(labelMat[0:3])
-        xs = tf.placeholder(dtype=tf.float32, shape=[None, 13])
-        mean, std = tf.nn.moments(xs, axes=[0])
-        scale = 0.1
-        shift = 0
-        epsilon = 0.001
-        data = tf.nn.batch_normalization(xs, mean, std, shift, scale, epsilon)
-        dbn = DBN(n_in=13, n_out=1, hidden_layers_sizes=[900,900,500])
+        trainX= dataMat[:500, :]
+        trainY = labelMat[:500]
+        testX = dataMat[500:, :]
+        testY = labelMat[500:]
+
+        x_train = MaxMinNormalization(trainX)
+        # print(x_train[0:3])
+        y_train = MaxMinNormalization(np.transpose([trainY]))
+        # print(y_train[0:3])
+        x_test = MaxMinNormalization(testX)
+
+        y_test = MaxMinNormalization(np.transpose([testY]))
+
+        sess = tf.Session(graph=graph)
+        dbn = DBN(n_in=x_train.shape[1], n_out=1, hidden_layers_sizes=[13,10,10])
         init = tf.global_variables_initializer()
+        sess.run(init)
         saver = tf.train.Saver()
+        tf.set_random_seed(seed=1111)
 
-    with tf.Session(graph=graph) as sess:
-       sess.run(mean, feed_dict={xs: dataMat})
-       sess.run(std, feed_dict={xs: dataMat})
-       num = sess.run(data, feed_dict={xs:dataMat})
-       # print(num)
+        dbn.pretrain(sess, x_train, lr=lr, pretraining_epochs=100)
+        dbn.finetuning(sess, x_train, y_train, x_test, y_test, lr=lr, training_epochs=100)
+        dbn.predict(sess, x_test)
+
+        file_name = 'saved_model/model.ckpt'  # 将保存到当前目录下的的saved_model文件夹下model.ckpt文件
+        saver.save(sess, file_name)
 
 
-       trainX=num[:400,:]
-       trainY =labelMat[:400]
-       testX=dataMat[400:,:]
-       testY = labelMat[400:]
-
-       # print(trainX[0:3])
-       # print(trainY[0:3])
-       # print(testX[0:3])
-       # print(testY[0:3])
-
-       sess.run(init)
-
-       tf.set_random_seed(seed=99999)
-       np.random.seed(123)
-       dbn.pretrain(sess, trainX, pretraining_epochs=train_ecpho,lr=lr)
-       dbn.finetuning(sess, trainX, trainY, testX, testY, lr=lr, training_epochs=train_ecpho)
-
-       file_name = 'saved_model/model.ckpt'  # 将保存到当前目录下的的saved_model文件夹下model.ckpt文件
-       saver.save(sess, file_name)
+        end_time0 = timeit.default_timer()
+        print("\nThe Predict process ran for {0}".format((end_time0 - start_time0)))
 

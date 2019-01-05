@@ -5,7 +5,7 @@ author:Cuson
 2019/12/16
 """
 import tensorflow as tf
-import math
+from tensorflow.contrib import layers
 import numpy as np
 import random
 
@@ -59,14 +59,12 @@ class BPNeuralNetwork:
             # clip_by_value(v,min,max) 截取v,<min表示为min,>max表示为max
             # opt = tf.clip_by_value(self.output, clip_value_min=1e-10, clip_value_max=1.0)
             # softmax_cross_entropy_with_logits(logits,labels,name=None) 相似性概率
-            cost_ = tf.reduce_mean(tf.square(tf.subtract(y ,self.output)))
+            # cost_ = tf.reduce_mean(tf.square(tf.subtract(y ,self.output)))+layers.l2_regularizer(0.01)(self.W)
+            cost_=tf.losses.mean_squared_error(y,self.output)+layers.l2_regularizer(0.01)(self.W)
             # summary.scalar对标量数据汇总
             tf.summary.scalar('loss', -cost_)
             return cost_
 
-    # def accuarcy(self, y):
-    #     """errors"""
-    #     # tf.equal(A,B)返回一个矩阵，维度与A相同[True,False...]
-    #     correct_pred = tf.equal(self.y_pred, tf.argmax(y, axis=1))
-    #     # tf.cast(x,dtype,name=None)数据格式转换x->dtpte
-    #     return tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    def accuarcy(self, y):
+
+        return tf.losses.mean_squared_error(y,self.output)

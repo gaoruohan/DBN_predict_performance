@@ -7,6 +7,7 @@ author:Cuson
 # import timeit
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import layers
 
 class RBM(object):
     """A Restricted Boltzmann Machines class"""
@@ -139,7 +140,7 @@ class RBM(object):
         # activation_v_clip = tf.clip_by_value(activation_v, clip_value_min=1e-10, clip_value_max=1)
         # reduce_activation_v_clip = tf.clip_by_value(1.0 - activation_v, clip_value_min=1e-10, clip_value_max=1)
         # cross_entropy = -tf.reduce_mean(tf.reduce_sum(self.input*(tf.log(activation_v_clip)) + (1.0 - self.input)*(tf.log(reduce_activation_v_clip)), axis=1))
-        # cross_entropy = tf.reduce_mean(tf.reduce_sum(self.input * (tf.log(activation_v_clip)) + (1.0 - self.input) * (tf.log(reduce_activation_v_clip)), axis=1))
+         # cross_entropy = tf.reduce_mean(tf.reduce_sum(self.input * (tf.log(activation_v_clip)) + (1.0 - self.input) * (tf.log(reduce_activation_v_clip)), axis=1))
         cross_entropy = tf.reduce_mean(tf.square(self.input - activation_v))
         return cross_entropy
 
