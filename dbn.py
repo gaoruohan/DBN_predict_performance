@@ -8,6 +8,8 @@ import os
 
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
+from sklearn.svm import SVR
+from sklearn.model_selection import cross_val_score,cross_val_predict, GridSearchCV
 from BP import BPNeuralNetwork
 import tensorflow as tf
 import numpy as np
@@ -67,7 +69,7 @@ class DBN(object):
                 with tf.name_scope('rbm_layer'):
                     self.rbm_layers.append(RBM(inpt=layer_input, n_visiable=input_size, n_hidden=hidden_layers_sizes[i],
                                                W=sigmoid_layer.W, hbias=sigmoid_layer.b))
-            # We use the LogisticRegression layer as the output layer
+            # We use the BP layer as the output layer
             with tf.name_scope('output_layer'):
                 self.output_layer = BPNeuralNetwork(inpt=self.layers[-1].output, n_in=hidden_layers_sizes[-1],n_out=n_out)
         self.params.extend(self.output_layer.params)
@@ -169,6 +171,26 @@ class DBN(object):
         dbn_y_pre.to_csv('NSW_06.csv')
         print("\nPredict over...\n")
 
+    # SVR输出预测结果
+    def svr_output(self,sess,test_x,test_y):
+        input_svr=sess.run(self.layers[-1].output,feed_dict={self.x:test_x})
+        print("\nsvr predict...\n")
+        svr=SVR(gamma=0.0005,kernel='rbf',C=15,epsilon=0.008)
+        rmse=np.sqrt(-cross_val_score(svr,input_svr,test_y.ravel(),scoring="neg_mean_squared_error",cv=5))
+        score=cross_val_predict(svr,input_svr,test_y.ravel(),cv=5)
+        print(rmse.mean())
+        print(pd.DataFrame(mm.inverse_transform(score.reshape(-1,1))))
+
+    # 网格搜索最优参数
+    def grid_get(self,sess,model,test_x, test_y, param_grid):
+        input_svr = sess.run(self.layers[-1].output, feed_dict={self.x: test_x})
+        grid_search = GridSearchCV(model, param_grid, cv=5, scoring="neg_mean_squared_error")
+        grid_search.fit(input_svr, test_y)
+        print(grid_search.best_params_, np.sqrt(-grid_search.best_score_))
+        grid_search.cv_results_['mean_test_score'] = np.sqrt(-grid_search.cv_results_['mean_test_score'])
+        print(pd.DataFrame(grid_search.cv_results_)[['params', 'mean_test_score', 'std_test_score']])
+
+
 def loadDataSet(data, ratio):
     trainingData = []
     testData = []
@@ -209,10 +231,10 @@ if __name__ == "__main__":
         dataMat, labelMat = splitDataSet(filename)
         # print(dataMat[0:3])
         # print(labelMat[0:3])
-        trainX= dataMat[:500, :]
-        trainY = labelMat[:500]
-        testX = dataMat[500:, :]
-        testY = labelMat[500:]
+        trainX= dataMat[:300, :]
+        trainY = labelMat[:300]
+        testX = dataMat[300:, :]
+        testY = labelMat[300:]
 
         x_train = MaxMinNormalization(trainX)
         # print(x_train[0:3])
@@ -231,7 +253,9 @@ if __name__ == "__main__":
 
         dbn.pretrain(sess, x_train, lr=lr, pretraining_epochs=100)
         dbn.finetuning(sess, x_train, y_train, x_test, y_test, lr=lr, training_epochs=100)
-        dbn.predict(sess, x_test)
+        # dbn.grid_get(sess,model=SVR(),test_x=x_test,test_y=y_test,param_grid={'C': [9, 11, 13, 15], 'kernel': ["rbf"], "gamma": [0.0003, 0.0004,0.0005], "epsilon": [0.008, 0.009]})
+        dbn.svr_output(sess,x_test,y_test)
+        # dbn.predict(sess, x_test)
 
         file_name = 'saved_model/model.ckpt'  # 将保存到当前目录下的的saved_model文件夹下model.ckpt文件
         saver.save(sess, file_name)

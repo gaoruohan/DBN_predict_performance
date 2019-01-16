@@ -67,4 +67,4 @@ class BPNeuralNetwork:
 
     def accuarcy(self, y):
 
-        return tf.losses.mean_squared_error(y,self.output)
+        return tf.sqrt(tf.losses.mean_squared_error(y,self.output))
